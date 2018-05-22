@@ -1,0 +1,11 @@
+{
+  "name": "pesukone",
+  "version": "0.0.1",
+  "scripts": {
+    "test": "mocha",
+	"start": "node pesukone.js"
+  },
+    "dependencies": {
+    "body-parser": "^1.18.3"
+	  }
+}
