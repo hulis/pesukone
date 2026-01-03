@@ -1,116 +1,108 @@
-const http = require('http');
+const http = require("http");
 
-var wmStates = ["idle","filling water","washing","rinsing","spinning"];
-var wmStatus = 0;
-var testi = {"cmd":"status"};
-var running = false;
-var perkele = "perkele";
+// Washing machine states
+const wmStates = [
+  "idle",
+  "filling water",
+  "washing",
+  "rinsing",
+  "spinning",
+  "finished"
+];
 
+let wmStatus = 0;
+let running = false;
+let timer = null;
+
+/**
+ * Advances the washing machine to the next state
+ */
+function advanceState() {
+  if (!running) return;
+
+  if (wmStatus < wmStates.length - 1) {
+    wmStatus++;
+    console.log("State:", wmStates[wmStatus]);
+  } else {
+    // End of program
+    stopMachine();
+  }
+}
+
+/**
+ * Starts the washing machine cycle
+ */
+function startMachine() {
+  if (running) return false;
+
+  running = true;
+  wmStatus = 0;
+  console.log("Machine started");
+
+  timer = setInterval(advanceState, 5000);
+  return true;
+}
+
+/**
+ * Stops the washing machine cycle
+ */
+function stopMachine() {
+  running = false;
+  wmStatus = 0;
+
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  console.log("Machine stopped");
+}
+
+/**
+ * HTTP server
+ */
 http.createServer((req, res) => {
-    if (req.method == 'POST' && req.url == '/api') {
-        var whole = ''
-        req.on('data', (chunk) => {
-            whole = chunk.toString()
-			var jotain = whole.cmd
-        })
-	
-	
-	
-        req.on('end', () => {
-			
-			try {
-				var jotain = JSON.parse(whole);
-			} catch (e) {
-			   console.log(e);
-			   jotain = {"cmd":"error"};
-			}
-			
-			if (jotain.cmd == 'status'){
-				perkele = jotain.cmd;
-				res.writeHead(200, 'OK', {'Content-Type': 'text/plain'})
-				res.end('Washingmachine state: ' + wmStates[wmStatus])
-			}
-			if(jotain.cmd == 'start'){
-				perkele = jotain.cmd;
-				if (running == true){
-					res.writeHead(200, 'OK', {'Content-Type': 'text/plain'})
-					res.end('Error: Washinmachine already running')
-					
-				}
-				else{
-					wmStatus = 0;
-					running = true;
-					res.writeHead(200, 'OK', {'Content-Type': 'text/plain'})
-					res.end('Washing...')
-				}
-				
-			}
-			if(jotain.cmd == 'abort'){
-				wmStatus = -1;
-				res.writeHead(200, 'OK', {'Content-Type': 'text/plain'})
-				res.end('Aborting...')
-			}
-			else{
-				res.writeHead(200, 'OK', {'Content-Type': 'text/plain'})
-				res.end('Invalid command')
-			}
-        })
+  if (req.method !== "POST" || req.url !== "/api") {
+    res.writeHead(404);
+    return res.end();
+  }
 
+  let body = "";
+
+  req.on("data", chunk => {
+    body += chunk.toString();
+  });
+
+  req.on("end", () => {
+    let data;
+
+    try {
+      data = JSON.parse(body);
+    } catch {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      return res.end("Invalid JSON");
     }
-	else{
-		res.statusCode = 404;
-		res.end();
-	}
 
-}).listen(3000)
+    res.writeHead(200, { "Content-Type": "text/plain" });
 
+    if (data.cmd === "status") {
+      return res.end(`State: ${wmStates[wmStatus]}`);
+    }
 
-async function pesukone() {
-  return new Promise(function (resolve, reject) {
-        if (wmStatus >= 0 && wmStatus < 4 && running == true) {
-            wmStatus++;
-            setTimeout(() => {resolve(wmStatus);}, 5000); // fulfilled
-			console.log(wmStates[wmStatus]);
-        } else {
-			wmStatus = 0;
-			running = false;
-            reject(wmStatus); // reject
-			
-        }
-  }).catch(error => console.log(wmStates[wmStatus]));
-}
+    if (data.cmd === "start") {
+      if (!startMachine()) {
+        return res.end("Error: machine already running");
+      }
+      return res.end("Washing started");
+    }
 
-async function isrunning()
-{
-	return new Promise(function (resolve, reject){
-		if (running == false)
-		{	
-			wmStatus = 0;
-			setTimeout(() => {resolve(wmStatus);}, 5000);
-		}
-		else{
-			running = false;
-			wmStatus = 0;
-			setTimeout(() => {reject(wmStatus);}, 5000);
-		}
-	}).catch(error => console.log(error));
-}
+    if (data.cmd === "abort") {
+      stopMachine();
+      return res.end("Washing aborted");
+    }
 
-async function facepalm() {
-	console.log(wmStates[wmStatus]);
-	for(;;)
-	{
-		//if(wmStatus >= 0 && wmStatus < 4 && running == true)
-		if(running == true)
-		{
-		wmStatus = await pesukone();
-		}
-		else
-		{
-		wmStatus = await isrunning();
-		
-		}
-	}
-}
-
-facepalm();
+    return res.end("Invalid command");
+  });
+}).listen(3000, () => {
+  console.log("Server running on port 3000");
+});
